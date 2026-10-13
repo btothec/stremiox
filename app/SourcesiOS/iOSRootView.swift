@@ -1,15 +1,19 @@
 import SwiftUI
+#if canImport(AppKit) && !targetEnvironment(macCatalyst)
+import AppKit   // NSApplication.didBecomeActiveNotification (Mac root overlay path)
+#endif
 
 /// Native iOS root: a CUSTOM bottom-tab shell over the shared engine. A native `TabView` collapses
 /// the 5th+ tabs into a system "More" tab on iPhone, burying Add-ons and Settings; instead we drive
-/// the visible screen with a `@State` selection and render our own brand-styled bar so all SEVEN tabs
+/// the visible screen with a `@State` selection and render our own brand-styled bar so all EIGHT tabs
 /// stay visible at once (matching the tvOS pill bar). Surfaces are filled in one at a time during the
 /// 0.3.0 rebase; Home is the first real one (poster rails from CoreBridge).
 struct iOSRootView: View {
-    /// The seven destinations, in display order: Home · Discover · Live · Library · Search · Add-ons
-    /// · Settings (Live sits after Discover; Add-ons beside Settings, mirroring tvOS).
+    /// The eight destinations, in display order: Home · Discover · Live · Library · Downloads
+    /// · Search · Add-ons · Settings (Live sits after Discover; Add-ons beside Settings, mirroring
+    /// tvOS. The Downloads tab is 0.7's download manager.)
     private enum Tab: Int, CaseIterable {
-        case home, discover, live, library, search, addons, settings
+        case home, discover, live, library, downloads, search, addons, settings
 
         var title: String {
             switch self {
@@ -17,6 +21,7 @@ struct iOSRootView: View {
             case .discover: return "Discover"
             case .live: return "Live"
             case .library: return "Library"
+            case .downloads: return "Downloads"
             case .search: return "Search"
             case .addons: return "Add-ons"
             case .settings: return "Settings"
@@ -29,6 +34,7 @@ struct iOSRootView: View {
             case .discover: return "safari.fill"
             case .live: return "dot.radiowaves.left.and.right"
             case .library: return "books.vertical.fill"
+            case .downloads: return "arrow.down.circle.fill"
             case .search: return "magnifyingglass"
             case .addons: return "puzzlepiece.extension.fill"
             case .settings: return "gearshape.fill"
@@ -43,6 +49,7 @@ struct iOSRootView: View {
             case .home: return "house"
             case .discover: return "safari"
             case .library: return "books.vertical"
+            case .downloads: return "arrow.down.circle"
             case .addons: return "puzzlepiece.extension"
             case .settings: return "gearshape"
             case .live, .search: return icon
@@ -51,10 +58,18 @@ struct iOSRootView: View {
     }
 
     @State private var tab: Tab = .home
+    @ObservedObject private var downloads = DownloadStore.shared
+    /// The download the Downloads page asked to play, presented full-screen via the shared player.
+    private struct DownloadPlayerLaunch: Identifiable {
+        let id = UUID()
+        let url: URL
+        let title: String
+    }
+    @State private var downloadPlayer: DownloadPlayerLaunch?
 
     var body: some View {
         VStack(spacing: 0) {
-            // Selected screen fills the space above the bar. We keep all six in a ZStack so each
+            // Selected screen fills the space above the bar. We keep all eight in a ZStack so each
             // screen's own state (scroll position, search query, engine subscriptions) survives a
             // tab switch instead of being torn down and rebuilt every time.
             ZStack {
@@ -66,6 +81,9 @@ struct iOSRootView: View {
                 iOSDiscoverView(isActive: tab == .discover).opacity(tab == .discover ? 1 : 0)
                 iOSLiveView().opacity(tab == .live ? 1 : 0)
                 iOSLibraryView(isActive: tab == .library).opacity(tab == .library ? 1 : 0)
+                DownloadsView(openPlayer: { url, title in
+                    downloadPlayer = DownloadPlayerLaunch(url: url, title: title)
+                }).opacity(tab == .downloads ? 1 : 0)
                 iOSSearchView(isActive: tab == .search).opacity(tab == .search ? 1 : 0)
                 AddonsView().opacity(tab == .addons ? 1 : 0)
                 iOSSettingsView().opacity(tab == .settings ? 1 : 0)
@@ -76,9 +94,34 @@ struct iOSRootView: View {
         }
         .background(Theme.Palette.canvas.ignoresSafeArea())
         .tint(Theme.Palette.accent)
+        // Finished downloads play through the SAME native mpv player path as streaming (goal item 5:
+        // subtitles / audio track selection behave identically), fed by the server's /stream route.
+        // On macOS this resolves to the root-overlay player host via the shared shim, like every
+        // other player cover site.
+        .platformFullScreenPlayerCover(item: $downloadPlayer) { item in
+            PlayerScreen(url: item.url, title: item.title, headers: nil, resumeSeconds: 0,
+                         recordMeta: nil, onClose: { downloadPlayer = nil })
+                .ignoresSafeArea()
+        }
+        // Downloads are foreground-only: the node runtime suspends with the app, so re-sync the
+        // mirror the moment we come back (running jobs resume their true state or show as paused).
+        .onReceive(Self.didBecomeActivePublisher) { _ in
+            DownloadStore.shared.resumePollingOnForeground()
+        }
+        .onAppear { DownloadStore.shared.start() }
     }
 
-    /// Brand-styled bottom bar: seven equal items, each a small SF Symbol over a caption label. The
+    /// The platform's "app just became active" notification, cross-platform (SourcesiOS builds into
+    /// the macOS target too, where UIApplication does not exist).
+    static var didBecomeActivePublisher: NotificationCenter.Publisher {
+        #if canImport(UIKit)
+        return NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)
+        #else
+        return NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
+        #endif
+    }
+
+    /// Brand-styled bottom bar: equal-width items, each a small SF Symbol over a caption label. The
     /// selected item is tinted with the app accent; the rest read as tertiary text. A hairline +
     /// surface fill separates it from the content, and it respects the safe-area bottom inset.
     private var customTabBar: some View {
@@ -128,6 +171,18 @@ struct iOSRootView: View {
             .frame(maxWidth: .infinity)
             .padding(.bottom, 2)
             .contentShape(Rectangle())
+            // Live badge on the Downloads tab while anything is running or queued paused (goal 14:
+            // the count of active jobs, so the tab reads as busy even from Home).
+            .overlay(alignment: .topTrailing) {
+                if item == .downloads && downloads.activeCount > 0 {
+                    Text("\(downloads.activeCount)")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 5).padding(.vertical, 1)
+                        .background(Theme.Palette.accent, in: Capsule())
+                        .offset(x: 16, y: -2)
+                }
+            }
         }
         .buttonStyle(.plain)
         .accessibilityLabel(item.title)

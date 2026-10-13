@@ -17,6 +17,7 @@ struct iOSSettingsView: View {
     @ObservedObject private var updates = UpdateChecker.shared
     @EnvironmentObject private var profiles: ProfileStore
     @ObservedObject private var sourcePrefs = SourcePreferences.shared
+    @ObservedObject private var downloads = DownloadStore.shared
     @State private var serverOnline: Bool?
     @State private var editingProfile: UserProfile?
     @State private var showSignIn = false
@@ -56,6 +57,7 @@ struct iOSSettingsView: View {
                 appearanceSection.listRowBackground(Theme.Palette.surface1)
                 audioSubtitleSection.listRowBackground(Theme.Palette.surface1)
                 subtitleSection.listRowBackground(Theme.Palette.surface1)
+                downloadsSection.listRowBackground(Theme.Palette.surface1)
                 aboutSection.listRowBackground(Theme.Palette.surface1)
                 engineSection.listRowBackground(Theme.Palette.surface1)
             }
@@ -563,6 +565,48 @@ struct iOSSettingsView: View {
         Section("Engine") {
             LabeledContent("stremio-core schema", value: "\(core.schemaVersion)")
             LabeledContent("Home rows", value: "\(core.boardRows.count)")
+        }
+    }
+
+    // MARK: Downloads (0.7 download manager)
+
+    /// Reality, not fiction: the destination folder is owned by the embedded streaming server (the
+    /// same engine that streams torrents), so there is no folder picker and no iOS "Files" location,
+    /// and an app can neither enumerate nor sum another process's sandbox dir. What we CAN show,
+    /// honestly, is the size the server REPORTS for its own finished records (the /getAll sums).
+    /// No fake toggles: there is no server option for max concurrency (verified), and nodejs-mobile
+    /// cannot be bound to WiFi, so neither appears here as a switch.
+    @ViewBuilder private var downloadsSection: some View {
+        Section {
+            Toggle("Delete finished downloads automatically", isOn: Binding(
+                get: { downloads.autoDeleteAfterFinish },
+                set: { downloads.autoDeleteAfterFinish = $0 }
+            ))
+
+            HStack(spacing: Theme.Space.sm) {
+                Circle().fill(downloadServerColor).frame(width: 12, height: 12)
+                Text(downloads.serverStateText)
+                Spacer()
+                Text("\(downloads.items.count) item\(downloads.items.count == 1 ? "" : "s")")
+                    .font(Theme.Typography.label)
+                    .foregroundStyle(.secondary)
+            }
+            if downloads.totalFinishedBytes > 0 {
+                LabeledContent("Offline storage used", value: DownloadItem.humanBytes(downloads.totalFinishedBytes))
+            }
+            LabeledContent("Downloads run", value: "While the app is open")
+        } header: {
+            Text("Downloads")
+        } footer: {
+            Text("Files are stored by the embedded streaming server in its own app data folder, which iOS does not let the app show or move. Downloads progress only while StremioX is open: the server pauses with the app, and the Downloads page lists every unfinished job as paused so you can restart it.")
+        }
+    }
+
+    private var downloadServerColor: Color {
+        switch downloads.serverState {
+        case .ready: return .green
+        case .unknown: return Theme.Palette.textTertiary
+        case .serverDown, .routerMissing: return .orange
         }
     }
 }

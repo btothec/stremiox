@@ -355,6 +355,9 @@ enum NodeServer {
         env["HOME"] = home               // server reads HOME for its app-data path
         env["APP_PATH"] = serverData      // torrent cache + settings
         env["NO_CORS"] = "1"
+        // Mount the download-manager routes (the official app gates them the same way): server.js
+        // registers them at /$SERVER_IPC_KEY/downloader only when this env var is set.
+        env["SERVER_IPC_KEY"] = DownloadIPCKey.current()
         // Disable Chromecast/DLNA discovery. The native Mac UI has no cast feature, and the
         // server's SSDP multicast loop is pure overhead here. Matches the iOS/tvOS embed config.
         env["CASTING_DISABLED"] = "1"

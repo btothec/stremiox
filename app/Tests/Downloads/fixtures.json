@@ -1,0 +1,19 @@
+{
+  "note": "Exact JSON captured from the vendored server.js (desktop 4.21.0) exercised under real node on 2026-10-13, with SERVER_IPC_KEY set, against local throttled HTTP sources. These are the contract the client decodes.",
+  "add_running": {
+    "route": "/add?url=http%3A%2F%2F127.0.0.1%3A18081%2Fbig.mp4",
+    "json": "{\"total\":0,\"name\":\"\",\"downloaded\":0,\"progress\":0,\"speed\":0,\"id\":\"dmf4fqij6za\",\"url\":\"http://127.0.0.1:18081/big.mp4\",\"status\":\"running\"}"
+  },
+  "get_running_with_progress": {
+    "route": "/get?id=dmf4fqij6za",
+    "json": "{\"total\":40000000,\"name\":\"big.mp4\",\"downloaded\":12582912,\"progress\":31.457279999999997,\"speed\":2097152,\"id\":\"dmf4fqij6za\",\"url\":\"http://127.0.0.1:18081/big.mp4\",\"status\":\"running\",\"fileName\":\"big.mp4\"}"
+  },
+  "get_error_magnet": {
+    "route": "/get?id=7ubii9xxck8",
+    "json": "{\"total\":0,\"name\":\"\",\"downloaded\":0,\"progress\":0,\"speed\":0,\"id\":\"7ubii9xxck8\",\"url\":\"magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567\",\"status\":\"error\",\"error\":\"Protocol \\\"magnet:\\\" not supported. Expected \\\"http:\\\"\",\"fileName\":\"\"}"
+  },
+  "get_missing_id": {
+    "route": "/get?id=nope",
+    "json": "{\"error\":{\"message\":\"there is no download with this id\"}}"
+  }
+}

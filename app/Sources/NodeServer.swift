@@ -81,6 +81,9 @@ enum NodeServer {
         // linked in this app and would throw. These two discrete flags are the correct substitute.
         setenv("NO_HTTPS_SERVER", "1", 1)
         setenv("HLS_V2_DISABLED", "1", 1)
+        // Mount the download-manager routes (the official app gates them the same way): server.js
+        // registers them at /$SERVER_IPC_KEY/downloader only when this env var is set.
+        setenv("SERVER_IPC_KEY", DownloadIPCKey.current(), 1)
         #if STREMIOX_WEB_HOST
         // Only the WKWebView web-host target needs the 11471 reverse-proxy of web.stremio.com (so the
         // webview can load the UI from a loopback origin). The native iOS/tvOS apps have no webview, so

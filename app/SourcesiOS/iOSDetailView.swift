@@ -1,4 +1,9 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 /// Torrents: ask the embedded server to start fetching peers before playback. No-op for direct/debrid
 /// URLs (those carry a `url`, so no `/create` is needed). Port of the tvOS `prepareTorrent`, reusing
@@ -65,6 +70,7 @@ struct iOSDetailView: View {
     @State private var season = 1
     @State private var settleTimedOut = false            // movie/live resolution gave up → "No sources found", not a spinner
     @State private var torrentPrime: Task<Void, Never>?  // outstanding torrent /create retry loop, cancelled on disappear / new pick
+    @State private var downloadNote: String?             // one-line honest reason after a failed long-press Download (alert)
 
     /// The one thing presented full-screen at a time: a resolved player stream or the YouTube trailer.
     private enum Presentation: Identifiable {
@@ -139,6 +145,10 @@ struct iOSDetailView: View {
         .background(Theme.Palette.canvas.ignoresSafeArea())
         .navigationTitle(meta?.name ?? title)
         .inlineNavigationTitle()
+        .alert("Download", isPresented: Binding(get: { downloadNote != nil },
+                                                set: { if !$0 { downloadNote = nil } })) {
+            Button("OK", role: .cancel) { downloadNote = nil }
+        } message: { Text(downloadNote ?? "") }
         // Guard the meta load: the shared CoreBridge already holds this title's meta on an A -> back -> A
         // revisit, so re-loading it churns the engine and momentarily blanks the hero for no reason.
         .onAppear {
@@ -515,9 +525,45 @@ struct iOSDetailView: View {
             states: core.streamAddonStates(),
             settleTimedOut: settleTimedOut,
             continuity: rememberedQuality,
-            play: { stream, url in Task { await playStream(stream, url: url) } }
+            play: { stream, url in Task { await playStream(stream, url: url) } },
+            download: { stream in downloadStream(stream) },
+            downloadContextTitle: meta?.name ?? title,
+            downloadPoster: meta?.poster
         )
         .padding(.horizontal, Theme.Space.md)
+    }
+
+    /// Long-press → Download (ROADMAP 0.7). The embedded server owns the bytes; we hand it the
+    /// stream's URL and the catalogue context (title/poster) it does not carry, then surface any
+    /// honest failure (server offline, magnet rejected, custom server without the routes) as an
+    /// alert right where the user tapped. Success needs no alert: the tab badge + Downloads page do.
+    private func downloadStream(_ stream: CoreStream) {
+        guard let link = stream.url, !link.isEmpty else {
+            downloadNote = "This source has no downloadable URL (torrents stream but do not download in this build)."
+            return
+        }
+        let contextTitle = (meta?.name ?? title)
+            + (stream.name.map { " — " + $0.split(whereSeparator: \.isNewline).first.map(String.init) ?? "" } ?? "")
+        Task {
+            let result = await DownloadStore.shared.add(url: link, title: contextTitle, poster: meta?.poster)
+            if case .failure(let e) = result {
+                downloadNote = Self.downloadFailureText(e)
+            }
+        }
+    }
+
+    /// One-line, actionable explanation for each AddError (no swallow).
+    static func downloadFailureText(_ e: DownloadStore.AddError) -> String {
+        switch e {
+        case .serverUnreachable:
+            return "The streaming server is not running, so downloads cannot start. Open the app fully (downloads run only while it is open) and try again."
+        case .routerMissing:
+            return "This server (a custom remote server) does not expose downloads. Use the embedded server in Settings."
+        case .unsupportedMagnet:
+            return "Torrents cannot be downloaded in this build (the embedded streaming server has no torrent downloader). Direct and debrid links download fine."
+        case .server(let msg):
+            return "The server rejected the download: \(msg)"
+        }
     }
 
     /// Apply the Direct-links-only filter (drop every torrent source) so a user with the setting on
@@ -896,6 +942,7 @@ struct iOSEpisodeStreams: View {
     @State private var preparing = false
     @State private var settleTimedOut = false      // resolution gave up → show "No sources found", not a spinner
     @State private var torrentPrime: Task<Void, Never>?  // outstanding torrent /create retry loop, cancelled on disappear / new pick
+    @State private var downloadNote: String?       // one-line honest reason after a failed long-press Download (alert)
 
     private var backdropHeight: CGFloat {
         #if os(macOS)
@@ -915,7 +962,10 @@ struct iOSEpisodeStreams: View {
                     states: core.streamAddonStates(forStreamId: video.id),
                     settleTimedOut: settleTimedOut,
                     continuity: rememberedQuality,
-                    play: { stream, url in Task { await play(stream, url: url) } }
+                    play: { stream, url in Task { await play(stream, url: url) } },
+                    download: { stream in downloadStream(stream) },
+                    downloadContextTitle: "\(meta.name) S\(season)E\(video.episodeNumber)",
+                    downloadPoster: video.thumbnail ?? meta.poster
                 )
                 .padding(.horizontal, Theme.Space.md)
             }
@@ -925,6 +975,10 @@ struct iOSEpisodeStreams: View {
         .background(Theme.Palette.canvas.ignoresSafeArea())
         .navigationTitle(video.episodeTitle)
         .inlineNavigationTitle()
+        .alert("Download", isPresented: Binding(get: { downloadNote != nil },
+                                                set: { if !$0 { downloadNote = nil } })) {
+            Button("OK", role: .cancel) { downloadNote = nil }
+        } message: { Text(downloadNote ?? "") }
         // The engine loads per-episode streams on demand; trigger that load for THIS episode — but only
         // when the resident streams aren't already this episode's, so a back/forward revisit doesn't churn.
         .onAppear {
@@ -1057,6 +1111,24 @@ struct iOSEpisodeStreams: View {
         return await account.resumeOffset(for: pm)
     }
 
+    /// Long-press → Download for this episode's sources. Mirrors iOSDetailView.downloadStream with
+    /// episode-aware context (show name + S/E + the stream's release title).
+    private func downloadStream(_ stream: CoreStream) {
+        guard let link = stream.url, !link.isEmpty else {
+            downloadNote = "This source has no downloadable URL (torrents stream but do not download in this build)."
+            return
+        }
+        let contextTitle = "\(meta.name) S\(video.season ?? season)E\(video.episodeNumber)"
+            + (stream.name.map { " — " + $0.split(whereSeparator: \.isNewline).first.map(String.init) ?? "" } ?? "")
+        Task {
+            let result = await DownloadStore.shared.add(url: link, title: contextTitle,
+                                                        poster: video.thumbnail ?? meta.poster)
+            if case .failure(let e) = result {
+                downloadNote = iOSDetailView.downloadFailureText(e)
+            }
+        }
+    }
+
     /// Direct-links-only: drop every torrent source so a user with the setting on never sees or
     /// auto-plays one — the same `displayGroups` filter the tvOS `CoreStreamList` applies.
     private func displayGroups(_ groups: [CoreStreamSourceGroup]) -> [CoreStreamSourceGroup] {
@@ -1134,6 +1206,14 @@ struct iOSSourceList: View {
     var settleTimedOut = false                          // resolution gave up → show "No sources" not a spinner
     var continuity: String? = nil                       // remembered quality signature → same-quality Watch-in pick
     let play: (CoreStream, URL) -> Void
+    /// Long-press a source → Download it through the embedded server (0.7 download manager). The
+    /// caller owns the store call + the honest failure alert, because it also owns the catalogue
+    /// context (title/poster) the server record does not carry. nil disables the menu (Lite page).
+    var download: ((CoreStream) -> Void)? = nil
+    /// The title of the page the list sits on (episode-aware), for the download row's label + mirror.
+    var downloadContextTitle: String? = nil
+    /// Poster artwork for the download context menu (the meta's poster), optional.
+    var downloadPoster: String? = nil
 
     @State private var sourceFilter: String? = nil      // nil = all add-ons
     @State private var showAllSources = false           // the full ranked list is revealed on demand
@@ -1352,11 +1432,56 @@ struct iOSSourceList: View {
                 iOSStreamLabel(addon: addon, stream: stream, enabled: true)
             }
             .buttonStyle(RowFocusStyle())
+            .contextMenu { streamMenu(stream) }
         } else {
             iOSStreamLabel(addon: addon, stream: stream, enabled: false)
                 .background(Theme.Palette.surface1.opacity(0.5),
                             in: RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
+                .contextMenu { streamMenu(stream) }
         }
+    }
+
+    /// Long-press menu on a source row: Download (debrid / direct HTTPS), Copy video download link,
+    /// Copy magnet link — the vocabulary of the official app's MetaCatalogCell menus, minus its pay
+    /// wall. Torrents show Download DISABLED with the true reason: every server.js build the fetch
+    /// script ships is the desktop build, which has no torrent downloader (verified: magnet /add
+    /// comes back status "error", `Protocol "magnet:" not supported`). Deabling beats a confirm
+    /// sheet that can only ever fail.
+    @ViewBuilder private func streamMenu(_ stream: CoreStream) -> some View {
+        if let download {
+            if stream.isTorrent {
+                Button { } label: {
+                    Label("Download (needs a torrent-capable server build)", systemImage: "arrow.down.circle")
+                }
+                .disabled(true)
+            } else {
+                Button {
+                    download(stream)
+                } label: {
+                    Label("Download", systemImage: "arrow.down.circle")
+                }
+            }
+        }
+        if let link = stream.url, !link.isEmpty {
+            Button { Self.copyToPasteboard(link) } label: {
+                Label("Copy video download link", systemImage: "link")
+            }
+        }
+        if stream.isTorrent, let ih = stream.infoHash?.lowercased() {
+            Button { Self.copyToPasteboard("magnet:?xt=urn:btih:\(ih)") } label: {
+                Label("Copy magnet link", systemImage: "link")
+            }
+        }
+    }
+
+    /// Pasteboard write that compiles on iOS and macOS (this component builds into both targets).
+    private static func copyToPasteboard(_ s: String) {
+        #if canImport(UIKit)
+        UIPasteboard.general.string = s
+        #elseif canImport(AppKit)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(s, forType: .string)
+        #endif
     }
 
     private var eyebrow: String {

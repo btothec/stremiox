@@ -18,6 +18,9 @@ targets:
       # SourcesShared. This web-host target pulls in Sources (incl. the player) but not the rest
       # of SourcesShared, so it needs this one self-contained (Foundation-only) file explicitly.
       - path: SourcesShared/DiagnosticsLog.swift
+      # Sources/NodeServer.swift sets SERVER_IPC_KEY at boot (mounts the server's download router);
+      # the key helper is likewise Foundation-only, so the web-host target gets it explicitly too.
+      - path: SourcesShared/DownloadIPCKey.swift
       - Resources/Assets.xcassets
       - path: Resources/server.js
         buildPhase: resources
@@ -148,6 +151,30 @@ targets:
         GENERATE_INFOPLIST_FILE: "YES"
         INFOPLIST_KEY_CFBundleDisplayName: StremioX
         CODE_SIGNING_ALLOWED: "NO"
+  # Host-less unit tests for the 0.7 download manager (the pure client layer: DTOs, URL building,
+  # ETA math, the /getAll→store reducer, the IPC key). Foundation-only sources, no app host needed
+  # (bundle loader), so `test-without-building` runs it off a single build of this target alone.
+  StremioXDownloadsTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: Tests/Downloads
+        excludes: ["fixtures.json"]
+      - path: Tests/Downloads/fixtures.json
+        buildPhase: resources
+      - path: ../../app/SourcesShared/Downloads/DownloadModels.swift
+      - path: ../../app/SourcesShared/Downloads/DownloadService.swift
+      - path: ../../app/SourcesShared/Downloads/DownloadStore.swift
+      - path: ../../app/SourcesShared/DownloadIPCKey.swift
+      - path: ../../app/SourcesShared/StremioServer.swift
+      - path: ../../app/SourcesShared/TorrentTrackers.swift
+      - path: ../../app/Sources/Player/TrackPreferences.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.stremiox.downloadstests
+        GENERATE_INFOPLIST_FILE: "YES"
+        CODE_SIGNING_ALLOWED: "NO"
   # tvOS has NO WebKit, so this is a native client (SwiftUI + addon HTTP + libmpv),
   # NOT the iOS web-host app. It shares only the MPVKit player core (Sources/Player).
   StremioXTV:
@@ -240,6 +267,16 @@ schemes:
       config: Debug
     archive:
       config: Release
+  # The 0.7 download-manager unit tests: Foundation-only, host-less (macOS xctest runner), fast.
+  DownloadsTests:
+    build:
+      targets:
+        StremioXDownloadsTests: [test]
+    test:
+      targets:
+        - StremioXDownloadsTests
+      diagnostics:
+        enableAddressSanitizer: false
   StremioXiOSNative:
     build:
       targets:
