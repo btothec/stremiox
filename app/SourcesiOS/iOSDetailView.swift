@@ -533,6 +533,14 @@ struct iOSDetailView: View {
         .padding(.horizontal, Theme.Space.md)
     }
 
+
+    /// The stream's short release title, first line only, for download context labels.
+    static func releaseSuffix(_ stream: CoreStream) -> String {
+        guard let n = stream.name, !n.isEmpty else { return "" }
+        let first = n.split(whereSeparator: \.isNewline).first.map(String.init) ?? n
+        return " — " + first
+    }
+
     /// Long-press → Download (ROADMAP 0.7). The embedded server owns the bytes; we hand it the
     /// stream's URL and the catalogue context (title/poster) it does not carry, then surface any
     /// honest failure (server offline, magnet rejected, custom server without the routes) as an
@@ -542,8 +550,8 @@ struct iOSDetailView: View {
             downloadNote = "This source has no downloadable URL (torrents stream but do not download in this build)."
             return
         }
-        let contextTitle = (meta?.name ?? title)
-            + (stream.name.map { " — " + $0.split(whereSeparator: \.isNewline).first.map(String.init) ?? "" } ?? "")
+        let base = meta?.name ?? title
+        let contextTitle: String = base + Self.releaseSuffix(stream)
         Task {
             let result = await DownloadStore.shared.add(url: link, title: contextTitle, poster: meta?.poster)
             if case .failure(let e) = result {
@@ -1118,8 +1126,8 @@ struct iOSEpisodeStreams: View {
             downloadNote = "This source has no downloadable URL (torrents stream but do not download in this build)."
             return
         }
-        let contextTitle = "\(meta.name) S\(video.season ?? season)E\(video.episodeNumber)"
-            + (stream.name.map { " — " + $0.split(whereSeparator: \.isNewline).first.map(String.init) ?? "" } ?? "")
+        let base = "\(meta.name) S\(video.season ?? season)E\(video.episodeNumber)"
+        let contextTitle: String = base + iOSDetailView.releaseSuffix(stream)
         Task {
             let result = await DownloadStore.shared.add(url: link, title: contextTitle,
                                                         poster: video.thumbnail ?? meta.poster)

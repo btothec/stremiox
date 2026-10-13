@@ -19,9 +19,8 @@ struct DownloadsView: View {
             content
         }
         .confirmationDialog("Delete this download? This removes the file from the device.",
-                            isPresented: Binding(get: { confirmDeleteID != nil },
-                                                 set: { if !$0 { confirmDeleteID = nil } }),
-                            title: nil, titleVisibility: .visible) {
+                            isPresented: deleteBinding,
+                            titleVisibility: .visible) {
             Button("Delete", role: .destructive) {
                 if let id = confirmDeleteID { Task { await store.remove(id: id) } }
                 confirmDeleteID = nil
@@ -29,14 +28,23 @@ struct DownloadsView: View {
             Button("Cancel", role: .cancel) { confirmDeleteID = nil }
         }
         .confirmationDialog("Delete ALL downloads? Files are removed from the device.",
-                            isPresented: $confirmDeleteAll, title: nil, titleVisibility: .visible) {
+                            isPresented: $confirmDeleteAll, titleVisibility: .visible) {
             Button("Delete All", role: .destructive) { Task { await store.removeAllConfirmed() } }
             Button("Cancel", role: .cancel) {}
         }
-        .alert("Download failed", isPresented: Binding(get: { addError != nil },
-                                                       set: { if !$0 { addError = nil } })) {
+        .alert("Download failed", isPresented: noteBinding,
+               actions: {
             Button("OK", role: .cancel) { addError = nil }
-        } message: { Text(addError ?? "") }
+        }, message: { Text(addError ?? "") })
+    }
+
+    /// The alert/confirm bindings kept as one explicit type each so the type-checker stays quick.
+    private var deleteBinding: Binding<Bool> {
+        Binding(get: { confirmDeleteID != nil }, set: { if !$0 { confirmDeleteID = nil } })
+    }
+
+    private var noteBinding: Binding<Bool> {
+        Binding(get: { addError != nil }, set: { if !$0 { addError = nil } })
     }
 
     // MARK: Content
