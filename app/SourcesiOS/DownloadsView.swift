@@ -283,6 +283,9 @@ struct DownloadsView: View {
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
+        // Keep action labels on one line at small control size (screenshot pass: Pause/Delete
+        // wrapped to three lines inside the narrow bordered pill).
+        .fixedSize()
         .tint(item.status == .finished ? Theme.Palette.accent : item.status == .error ? Theme.Palette.danger : nil)
     }
 

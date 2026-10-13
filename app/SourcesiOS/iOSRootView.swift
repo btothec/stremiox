@@ -179,15 +179,16 @@ struct iOSRootView: View {
             .padding(.bottom, 2)
             .contentShape(Rectangle())
             // Live badge on the Downloads tab while anything is running or queued paused (goal 14:
-            // the count of active jobs, so the tab reads as busy even from Home).
-            .overlay(alignment: .topTrailing) {
+            // the count of active jobs, so the tab reads as busy even from Home). Anchored to the
+            // glyph so it never drifts into a neighbour's cell.
+            .overlay(alignment: .top) {
                 if item == .downloads && downloads.activeCount > 0 {
                     Text("\(downloads.activeCount)")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 5).padding(.vertical, 1)
                         .background(Theme.Palette.accent, in: Capsule())
-                        .offset(x: 16, y: -2)
+                        .offset(x: 26, y: -3)
                 }
             }
         }
