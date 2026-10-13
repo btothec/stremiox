@@ -60,6 +60,11 @@ struct iOSRootView: View {
     }
 
     @State private var tab: Tab = .home
+    /// Debug hook (mirrors the existing `-stremiox-no-server` precedent): launch with
+    /// `-stremiox-tab-downloads` to open straight on the Downloads page (QA/screenshots).
+    init() {
+        if CommandLine.arguments.contains("-stremiox-tab-downloads") { _tab = State(initialValue: .downloads) }
+    }
     @ObservedObject private var downloads = DownloadStore.shared
     /// The download the Downloads page asked to play, presented full-screen via the shared player.
     private struct DownloadPlayerLaunch: Identifiable {

@@ -75,6 +75,8 @@ Every Apple app is fully native and runs on stremio-core, the same Rust engine t
 
 **Apple TV, iPhone, iPad, and Mac are at parity.** The cinematic detail page, ranked Watch Now with the two-level quality picker, per-add-on source grouping, an interactive auto-rotating featured hero with a muted in-hero trailer, full Settings, profiles, themes, subtitle styling, and **Live TV** are on every Apple device. Where a platform has a natural extra, it gets it: trailers play through the embedded server on Apple TV and an in-app player on iPhone, iPad, and Mac.
 
+**Offline downloads (iPhone, iPad, and Mac, in development on `feature/downloads`).** Long-press a debrid or direct source and tap Download: the embedded streaming server fetches the file to its own folder while the app is open, a Downloads tab tracks progress, speed, and ETA with a tab badge, and finished items Play through the same native mpv path (scrubbing, subtitles, audio tracks, all identical to streaming) entirely offline. Server-backed pause, resume, and delete; interrupted jobs come back labelled with a one-tap Restart; auto-delete after finish is opt-in. Torrents stream as always; torrent *downloads* need a torrent-capable server build (see ROADMAP), and the menu says so rather than hiding it.
+
 **Desktop and Android are in active development** on the same shared engine: a native desktop app for Windows, Linux, and Mac (via Tauri, with its own embedded torrent server), and an Android app for phone and TV. These are not shipped yet; the Apple apps are.
 
 Everything the apps do today (Apple TV shown; iPhone, iPad, and Mac are at parity unless noted):
