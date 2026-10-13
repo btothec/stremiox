@@ -108,13 +108,13 @@ final class DownloadStore: ObservableObject {
     /// One /getAll round-trip → merged item list. Failures are non-destructive: the mirror stands.
     func syncOnce() async {
         switch await DownloadService.getAll() {
-        case .failure("not mounted"):
+        case .failure(let f) where f.message == "not mounted":
             // The HTTP server ANSWERED but the download router is not mounted (custom remote
             // server without the key/env). Surface honestly; mirror stands.
             serverState = .routerMissing
         case .failure(let e):
             serverState = .serverDown
-            Self.log.warning("getAll failed: \(e, privacy: .public)")
+            Self.log.warning("getAll failed: \(e.message, privacy: .public)")
         case .success(let records):
             serverState = .ready
             // Reconcile FIRST so a record the server dropped (deleted elsewhere, or a partial the
@@ -258,14 +258,14 @@ final class DownloadStore: ObservableObject {
         if isMagnet && PlaybackSettings.torrentsDisabled { return .failure(.unsupportedMagnet) }
 
         switch await DownloadService.add(url: downloadURL, playerURL: nil) {
-        case .failure("not mounted"):
+        case .failure(let f) where f.message == "not mounted":
             serverState = .routerMissing
             return .failure(.routerMissing)
         case .failure(let msg):
             if serverState == .unknown || serverState == .serverDown {
                 return .failure(.serverUnreachable)
             }
-            return .failure(.server(msg))
+            return .failure(.server(msg.message))
         case .success(let rec):
             if rec.status == "error", (rec.url ?? "").hasPrefix("magnet:") {
                 _ = await DownloadService.remove(id: rec.id)
@@ -294,7 +294,7 @@ final class DownloadStore: ObservableObject {
     enum Act { case pause, resume, remove }
 
     private func act(_ act: Act, id: String) async {
-        let result: Result<Void, String>
+        let result: Result<Void, DownloadService.Failure>
         switch act {
         case .pause:
             result = await DownloadService.pause(id: id)
@@ -322,7 +322,7 @@ final class DownloadStore: ObservableObject {
             }
         }
         if case .failure(let e) = result {
-            Self.log.error("downloads action \(String(describing: act), privacy: .public) id=\(id, privacy: .public) failed: \(e, privacy: .public)")
+            Self.log.error("downloads action \(String(describing: act), privacy: .public) id=\(id, privacy: .public) failed: \(e.message, privacy: .public)")
         }
         await syncOnce()
     }

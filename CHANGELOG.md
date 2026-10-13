@@ -4,6 +4,10 @@ All notable changes to StremioX, newest first. StremioX is Apple TV first, with 
 
 What is planned next is in [ROADMAP.md](ROADMAP.md). To request a feature or report a bug, start a [GitHub Discussion](https://github.com/mamaclapper/StremioX/discussions) or [open an issue](https://github.com/mamaclapper/StremioX/issues).
 
+## Unreleased (feature/downloads)
+
+- **Offline downloads on iPhone, iPad, and Mac (ROADMAP 0.7, first cut).** Long-press any debrid or direct source and tap Download: the embedded streaming server (the same engine that streams torrents) fetches the file to its own app-data `downloads/` folder while the app is open. A new Downloads tab lists every job with a progress bar, live speed, and ETA, and badges the tab while anything runs. Pause and Resume round-trip the server; Delete removes the server record and unlinks the file. Finished items Play through the exact same native mpv player path as streaming (subtitle and audio track selection behave identically), served over loopback by the server's `/stream` route, so a downloaded file plays with the network off. A Settings section covers the reality: files live in the server's folder (iOS gives no app a picker for another process's sandbox), the total stored size comes from the server's own records, auto-delete-after-finish is offered, and there are no fake toggles (the server exposes no concurrency option, and nodejs-mobile cannot be bound to WiFi, so neither appears). The download manager never runs in the background: the server suspends with the app, and unfinished jobs come back labelled so you can restart them in one tap (this server build resumes interrupted files from zero, so the button honestly says Restart). Torrents download only where a torrent-capable server build is wired in; with the desktop server.js the fetch script ships, the Download action on magnets and torrents is disabled with the reason, and the copy-magnet workflow is untouched. Everything is local: no accounts, no entitlement checks, no remote kill switch, no paid tier.
+
 ## 0.3.0 beta 13 (prerelease) - 2026-06-14
 
 The build that fixes "no sources", plus the macOS player and the featured hero.

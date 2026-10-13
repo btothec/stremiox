@@ -1,5 +1,7 @@
 import SwiftUI
-#if canImport(AppKit) && !targetEnvironment(macCatalyst)
+#if canImport(UIKit)
+import UIKit   // UIApplication.didBecomeActiveNotification (foreground re-sync of downloads)
+#elseif canImport(AppKit) && !targetEnvironment(macCatalyst)
 import AppKit   // NSApplication.didBecomeActiveNotification (Mac root overlay path)
 #endif
 

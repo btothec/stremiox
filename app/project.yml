@@ -163,18 +163,22 @@ targets:
         excludes: ["fixtures.json"]
       - path: Tests/Downloads/fixtures.json
         buildPhase: resources
-      - path: ../../app/SourcesShared/Downloads/DownloadModels.swift
-      - path: ../../app/SourcesShared/Downloads/DownloadService.swift
-      - path: ../../app/SourcesShared/Downloads/DownloadStore.swift
-      - path: ../../app/SourcesShared/DownloadIPCKey.swift
-      - path: ../../app/SourcesShared/StremioServer.swift
-      - path: ../../app/SourcesShared/TorrentTrackers.swift
-      - path: ../../app/Sources/Player/TrackPreferences.swift
+      - path: SourcesShared/Downloads/DownloadModels.swift
+      - path: SourcesShared/Downloads/DownloadService.swift
+      - path: SourcesShared/Downloads/DownloadStore.swift
+      - path: SourcesShared/DownloadIPCKey.swift
+      - path: SourcesShared/StremioServer.swift
+      - path: SourcesShared/Addon.swift
+      - path: SourcesShared/TorrentTrackers.swift
+      - path: Sources/Player/TrackPreferences.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.stremiox.downloadstests
+        PRODUCT_NAME: StremioXDownloadsTests
         GENERATE_INFOPLIST_FILE: "YES"
         CODE_SIGNING_ALLOWED: "NO"
+        SWIFT_VERSION: "5.0"
+        PRODUCT_MODULE_NAME: DownloadsTestsKit
   # tvOS has NO WebKit, so this is a native client (SwiftUI + addon HTTP + libmpv),
   # NOT the iOS web-host app. It shares only the MPVKit player core (Sources/Player).
   StremioXTV:

@@ -1,11 +1,12 @@
 import XCTest
 import Foundation
-@testable import StremioXDownloadsTests
 
 // Unit tests for the 0.7 download manager's client layer: the server contract decoding (fixtures
 // are the EXACT JSON the vendored server.js returned when exercised under real node on 2026-10-13),
 // URL building (percent-encoding of the /add url= parameter), ETA math, and the /getAll→store
-// reducer (mirror reconcile + render ordering). No network, no server, no player.
+// reducer (mirror reconcile + render ordering). The code under test (the five download files +
+// StremioServer/TorrentTrackers/TrackPreferences) compiles INTO this bundle (no app host), so the
+// types are visible directly with no import. No network, no server, no player.
 
 private let fixtures = Bundle(for: BundleToken.self).url(forResource: "fixtures", withExtension: "json")
 
